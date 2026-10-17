@@ -4,6 +4,20 @@ Voice-first indoor navigation with real-time obstacle detection, powered by
 on-device AI. No guessing — the app reports uncertainty honestly rather than
 inventing confident answers.
 
+## Try it
+
+**https://manimimohit-glitch.github.io/pathable/**
+
+Open that link on any phone. It runs entirely in the browser — nothing to
+install, no account, no server.
+
+The camera needs an **HTTPS** address, which is what the link above is. Open
+it, then tap **Obstacle Detection** and allow camera access when your phone
+asks. On a phone, use your browser's **Add to Home Screen** to get an app icon
+for it.
+
+Everything runs on the device. No video or images are uploaded anywhere.
+
 ## Features
 
 **Navigation**
