@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0a0a1a">
+    <title>PathAble — Smart Indoor Navigation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- Splash Screen -->
+    <div id="splash-screen" class="screen active">
+        <div class="splash-bg">
+            <div class="splash-glow"></div>
+            <div class="splash-content">
+                <div class="splash-logo">
+                    <div class="logo-ring"></div>
+                    <span class="logo-icon">🧭</span>
+                </div>
+                <h1 class="splash-title">PathAble</h1>
+                <p class="splash-subtitle">Smart Indoor Navigation</p>
+                <div class="splash-loader">
+                    <div class="loader-bar"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Building Selection -->
+    <div id="building-screen" class="screen">
+        <div class="screen-header">
+            <h2>Select Building</h2>
+        </div>
+        <div class="building-list" id="building-list"></div>
+    </div>
+
+    <!-- Home Screen -->
+    <div id="home-screen" class="screen">
+        <div class="home-header">
+            <div class="location-pill">
+                <span class="pulse-dot"></span>
+                <span id="current-location-text">Main Entrance</span>
+            </div>
+            <span id="positioning-badge" class="badge badge-sim">SIMULATED</span>
+        </div>
+
+        <div class="home-content">
+            <!-- Voice Navigation - Primary Action -->
+            <button id="voice-nav-btn" class="btn-voice" aria-label="Voice navigation. Tap and speak your destination.">
+                <div class="voice-icon-wrap">
+                    <span class="voice-icon">🎤</span>
+                    <div class="voice-rings">
+                        <span class="ring ring-1"></span>
+                        <span class="ring ring-2"></span>
+                    </div>
+                </div>
+                <span class="voice-label">Where do you want to go?</span>
+            </button>
+
+            <!-- Quick Actions Grid -->
+            <div class="quick-grid">
+                <button class="quick-card" id="btn-start-nav" aria-label="Start navigation">
+                    <span class="quick-icon">▶️</span>
+                    <span class="quick-label">Start Navigation</span>
+                </button>
+                <button class="quick-card" id="btn-find-dest" aria-label="Find destination">
+                    <span class="quick-icon">🔍</span>
+                    <span class="quick-label">Find Destination</span>
+                </button>
+                <button class="quick-card" id="btn-nearby" aria-label="Find nearby places">
+                    <span class="quick-icon">📍</span>
+                    <span class="quick-label">Nearby Places</span>
+                </button>
+                <button class="quick-card" id="btn-obstacle" aria-label="Obstacle detection">
+                    <span class="quick-icon">👁️</span>
+                    <span class="quick-label">Obstacle Detection</span>
+                </button>
+            </div>
+
+            <!-- Emergency Button -->
+            <button id="btn-emergency" class="btn-emergency" aria-label="Emergency. Find nearest exit immediately.">
+                <span class="emergency-icon">🚨</span>
+                <span class="emergency-text">EMERGENCY</span>
+                <span class="emergency-sub">Find nearest exit</span>
+            </button>
+
+            <!-- Bottom Actions -->
+            <div class="bottom-actions">
+                <button id="btn-settings" class="btn-ghost" aria-label="Open settings">
+                    <span>⚙️</span> Settings
+                </button>
+                <button id="btn-admin" class="btn-ghost" aria-label="Open admin panel">
+                    <span>🔧</span> Admin
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation Screen -->
+    <div id="navigation-screen" class="screen">
+        <div class="nav-header">
+            <button id="btn-stop-nav" class="btn-stop" aria-label="Stop navigation">
+                <span>✕</span> Stop
+            </button>
+            <div class="nav-title">
+                <h2 id="nav-destination">Room 205</h2>
+                <span class="nav-status" id="nav-status">Navigating...</span>
+            </div>
+        </div>
+
+        <div class="nav-content">
+            <div class="instruction-card">
+                <div class="instruction-icon" id="instruction-icon">⬆️</div>
+                <div class="instruction-text" id="instruction-text">Walk straight for 10 meters</div>
+            </div>
+
+            <div class="nav-stats">
+                <div class="stat">
+                    <span class="stat-value" id="distance-remaining">25m</span>
+                    <span class="stat-label">Remaining</span>
+                </div>
+                <div class="stat-divider"></div>
+                <div class="stat">
+                    <span class="stat-value" id="next-turn">Right</span>
+                    <span class="stat-label">Next Turn</span>
+                </div>
+            </div>
+
+            <div class="nav-actions">
+                <button class="btn-action" id="btn-repeat" aria-label="Repeat last instruction">
+                    <span>🔁</span> Repeat
+                </button>
+                <button class="btn-action" id="btn-reroute" aria-label="Recalculate route">
+                    <span>🔄</span> Recalculate
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Obstacle Detection Screen -->
+    <div id="obstacle-screen" class="screen">
+        <div class="obstacle-header">
+            <button id="btn-stop-obstacle" class="btn-stop" aria-label="Stop obstacle detection">
+                <span>✕</span> Stop
+            </button>
+            <h2>Obstacle Detection</h2>
+        </div>
+
+        <div class="obstacle-content">
+            <div class="camera-container">
+                <video id="camera-video" autoplay playsinline muted></video>
+                <div class="camera-overlay">
+                    <div class="detection-box" id="detection-box"></div>
+                </div>
+                <div class="camera-status" id="camera-status">Initializing...</div>
+            </div>
+
+            <div class="detection-panel">
+                <div class="detection-row">
+                    <span class="det-label">Status</span>
+                    <span class="det-value" id="detection-status">—</span>
+                </div>
+                <div class="detection-row">
+                    <span class="det-label">Object</span>
+                    <span class="det-value" id="detected-object">—</span>
+                </div>
+                <div class="detection-row">
+                    <span class="det-label">Distance</span>
+                    <span class="det-value" id="detected-distance">—</span>
+                </div>
+                <div class="detection-row">
+                    <span class="det-label">Confidence</span>
+                    <span class="det-value" id="detection-confidence">—</span>
+                </div>
+                <div class="detection-row">
+                    <span class="det-label">Position</span>
+                    <span class="det-value" id="detection-position">—</span>
+                </div>
+            </div>
+
+            <div class="warning-banner" id="obstacle-warning" aria-live="assertive"></div>
+        </div>
+    </div>
+
+    <!-- Nearby Places Screen -->
+    <div id="nearby-screen" class="screen">
+        <div class="screen-header">
+            <button class="btn-back" id="btn-nearby-back" aria-label="Go back">
+                <span>←</span> Back
+            </button>
+            <h2>Nearby Places</h2>
+        </div>
+        <div class="nearby-list" id="nearby-list"></div>
+    </div>
+
+    <!-- Settings Screen -->
+    <div id="settings-screen" class="screen">
+        <div class="screen-header">
+            <button class="btn-back" id="btn-settings-back" aria-label="Go back">
+                <span>←</span> Back
+            </button>
+            <h2>Settings</h2>
+        </div>
+
+        <div class="settings-content">
+            <div class="settings-group">
+                <h3>Voice</h3>
+                <div class="setting-row">
+                    <label for="voice-speed">Speed</label>
+                    <input type="range" id="voice-speed" min="0.5" max="2" step="0.1" value="1">
+                    <span class="setting-val" id="voice-speed-value">1.0x</span>
+                </div>
+                <div class="setting-row">
+                    <label for="voice-volume">Volume</label>
+                    <input type="range" id="voice-volume" min="0" max="1" step="0.1" value="0.8">
+                    <span class="setting-val" id="voice-volume-value">80%</span>
+                </div>
+                <div class="setting-row">
+                    <label for="voice-language">Language</label>
+                    <select id="voice-language">
+                        <option value="en-US">English (US)</option>
+                        <option value="en-GB">English (UK)</option>
+                        <option value="hi-IN">Hindi</option>
+                        <option value="es-ES">Spanish</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <label for="auto-repeat"><input type="checkbox" id="auto-repeat"> Auto-repeat</label>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>Navigation</h3>
+                <div class="setting-row">
+                    <label for="route-preference">Route Type</label>
+                    <select id="route-preference">
+                        <option value="shortest">Shortest</option>
+                        <option value="safest">Safest</option>
+                        <option value="accessible">Accessible</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>Accessibility</h3>
+                <div class="setting-row">
+                    <label for="high-contrast"><input type="checkbox" id="high-contrast"> High Contrast</label>
+                </div>
+                <div class="setting-row">
+                    <label for="large-text"><input type="checkbox" id="large-text"> Large Text</label>
+                </div>
+                <div class="setting-row">
+                    <label for="vibration"><input type="checkbox" id="vibration" checked> Vibration</label>
+                </div>
+                <div class="setting-row">
+                    <label for="audio-alerts"><input type="checkbox" id="audio-alerts" checked> Audio Alerts</label>
+                </div>
+            </div>
+
+            <div class="settings-group">
+                <h3>Emergency</h3>
+                <div class="setting-row">
+                    <label for="emergency-contact">Contact Number</label>
+                    <input type="tel" id="emergency-contact" placeholder="+1234567890">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Panel -->
+    <div id="admin-screen" class="screen">
+        <div class="screen-header">
+            <button class="btn-back" id="btn-admin-back" aria-label="Go back">
+                <span>←</span> Back
+            </button>
+            <h2>Admin Panel</h2>
+        </div>
+
+        <div class="admin-content">
+            <div class="admin-tabs">
+                <button class="tab-btn active" data-tab="buildings">Buildings</button>
+                <button class="tab-btn" data-tab="locations">Locations</button>
+                <button class="tab-btn" data-tab="connections">Connections</button>
+                <button class="tab-btn" data-tab="beacons">Beacons</button>
+            </div>
+
+            <div class="tab-content" id="tab-buildings">
+                <button class="btn-add" id="btn-add-building">+ Add Building</button>
+                <div class="admin-list" id="admin-buildings-list"></div>
+            </div>
+            <div class="tab-content hidden" id="tab-locations">
+                <button class="btn-add" id="btn-add-location">+ Add Location</button>
+                <div class="admin-list" id="admin-locations-list"></div>
+            </div>
+            <div class="tab-content hidden" id="tab-connections">
+                <button class="btn-add" id="btn-add-connection">+ Add Connection</button>
+                <div class="admin-list" id="admin-connections-list"></div>
+            </div>
+            <div class="tab-content hidden" id="tab-beacons">
+                <button class="btn-add" id="btn-add-beacon">+ Add Beacon</button>
+                <div class="admin-list" id="admin-beacons-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voice Overlay -->
+    <div id="voice-overlay" class="hidden">
+        <div class="voice-wave">
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+            <div class="wave-bar"></div>
+        </div>
+        <div class="voice-text" id="voice-overlay-text">Listening...</div>
+    </div>
+
+    <!-- Toast -->
+    <div id="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="js/services/BuildingMapService.js"></script>
+    <script src="js/services/VoiceAssistantService.js"></script>
+    <script src="js/services/IndoorPositioningService.js"></script>
+    <script src="js/services/RoutePlanningService.js"></script>
+    <script src="js/services/NavigationInstructionService.js"></script>
+    <script src="js/services/ReroutingService.js"></script>
+    <script src="js/services/EmergencyNavigationService.js"></script>
+    <script src="js/services/ObjectDetectionService.js"></script>
+    <script src="js/services/DistanceEstimationService.js"></script>
+    <script src="js/services/ObstacleRiskService.js"></script>
+    <script src="js/services/AdminService.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

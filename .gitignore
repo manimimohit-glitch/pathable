@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build output
+dist/
+build/
+
+# Environment / secrets — never commit these
+.env
+.env.local
+*.key
+*.pem
+credentials.json
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local test artifacts
+coverage/
+.pytest_cache/
+__pycache__/
