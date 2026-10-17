@@ -21,23 +21,54 @@ inventing confident answers.
 
 | Layer | Method | Detects |
 |---|---|---|
-| 1 | TensorFlow.js + COCO-SSD | 80 classes: person, chair, table, door, bench… |
+| 1 | TensorFlow.js + COCO-SSD | 25 indoor-relevant classes: person, chair, bench, table, door, couch… |
 | 2 | Sobel edge analysis | Walls, with orientation and side |
 | 3 | Horizontal line pattern analysis | Stairs, with direction (up/down) and step count |
 
 Every layer uses temporal smoothing (3-of-5 frame confirmation) and non-maximum
-suppression, so a single noisy frame never triggers a false alarm.
+suppression, so a single noisy frame never triggers a false alarm. The confirmed
+set — not the raw per-frame set — is what reaches the user.
 
 **Distance estimation**
-Monocular distance from known object dimensions + camera geometry. Each estimate
-carries an explicit uncertainty label — `low`, `medium`, or `high` — and objects
-with no reliable basis report **"Unknown"** instead of a made-up number.
+Monocular distance from known object dimensions + camera geometry, computed in
+pixels from the normalized bounding box. Each estimate carries an explicit
+uncertainty label — `low`, `medium`, or `high` — and objects with no reliable
+basis report **"Unknown"** instead of a made-up number. Walls and stairs use a
+coarse apparent-size proxy and always report `medium` or higher.
 
 **Voice**
 - Speech-to-text command parsing: "navigate to room 205", "where is the
   cafeteria", "stop navigation", "emergency", "repeat"
 - Text-to-speech with adjustable speed, volume, and language
-- Priority-based alerts — critical warnings interrupt normal speech
+- Priority-based alerts — only a `critical` warning interrupts speech in
+  progress; everything else queues and plays in order
+- Voice is matched to the selected language rather than falling back to the
+  system default, which may be a different language entirely
+
+**Voice design — why it isn't chatty**
+
+A blind user walking with this in their hand turns the volume down within
+seconds of constant narration, so alerts are deliberately asymmetric:
+
+- **Escalate-only.** A thing that gets closer is announced; a thing receding
+  is not. Good news doesn't need speaking.
+- **Deduplicated by screen region.** "New object on my left" is a different
+  event from "the same object, still there".
+- **`info` is silent by default.** Distant objects appear on screen but are not
+  spoken. *Settings → Speak distant objects* turns that narration on.
+- **Never repeats a state.** Each risk level is announced once, not on a timer.
+- **Deduplication resets** when detection stops, so a fresh session re-announces.
+
+## Testing
+
+```bash
+node test-harness.js
+```
+
+Runs the detection → distance → risk → speech pipeline headlessly, with no
+browser or camera. Covers position resolution, distance plausibility, the
+alert-band thresholds, escalation-only alerting, unknown-class honesty, and
+command parsing. 20 checks.
 
 **Accessibility**
 - Dark, light, and high-contrast themes
@@ -91,6 +122,9 @@ smart-nav/
         ├── ObstacleRiskService.js        Risk classification and alerts
         └── AdminService.js              Full CRUD over map data
 ```
+
+Also at the project root: `test-harness.js`, the headless pipeline test
+described under [Testing](#testing).
 
 ## Notes on accuracy
 

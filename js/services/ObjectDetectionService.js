@@ -14,6 +14,20 @@ class ObjectDetectionService {
         this.isReady = false;
         this.detectionHistory = [];
         this.historySize = 5;
+        // 3-of-5 confirmation. This is what keeps single noisy frames silent;
+        // it was previously computed and then thrown away.
+        this.minConfirmFrames = 3;
+        // Mobility aids a phone-level detector can actually see. COCO-SSD's
+        // 80 classes are mostly irrelevant indoors and each one costs the user
+        // a false alert, so we detect fewer things and say them well.
+        // Every name here is a genuine COCO-SSD label.
+        this.relevantClasses = new Set([
+            'person', 'chair', 'bench', 'dining table', 'potted plant',
+            'couch', 'bed', 'door', 'tv', 'laptop',
+            'toilet', 'sink', 'refrigerator', 'book', 'clock', 'vase',
+            'bottle', 'cup', 'backpack', 'handbag', 'umbrella', 'suitcase',
+            'bicycle', 'motorcycle', 'car', 'bus', 'truck'
+        ]);
         this.confidenceThreshold = 0.45;
         this.nmsThreshold = 0.5;
         this._scriptsLoaded = false;
@@ -225,14 +239,17 @@ class ObjectDetectionService {
             // Combine all detections
             const allDetections = [...filtered, ...customDetections];
 
-            // Apply temporal smoothing
-            const smoothed = this._applyTemporalSmoothing(allDetections);
-
-            // Filter by confidence
-            const results = allDetections.filter(p => p.score >= this.confidenceThreshold);
+            // Drop noise classes, then require temporal confirmation.
+            // The confirmed set is what the user hears — a single frame of
+            // speckle never reaches them.
+            const relevant = allDetections.filter(
+                d => d.score >= this.confidenceThreshold &&
+                     (this.relevantClasses.has(d.class) || d.class === 'wall' || d.class === 'stairs')
+            );
+            const results = this._applyTemporalSmoothing(relevant);
 
             if (this._onDetectionCallback) {
-                this._onDetectionCallback(results, smoothed);
+                this._onDetectionCallback(results, relevant);
             }
         } catch (e) {
             console.warn('ObjectDetectionService: Detection error', e);
@@ -551,6 +568,10 @@ class ObjectDetectionService {
         return union > 0 ? intersection / union : 0;
     }
 
+    /**
+     * Require a class to persist for 3 of the last 5 frames before reporting it.
+     * Returns the confirmed subset of the current frame.
+     */
     _applyTemporalSmoothing(currentDetections) {
         this.detectionHistory.push(currentDetections);
         if (this.detectionHistory.length > this.historySize) {
@@ -564,33 +585,73 @@ class ObjectDetectionService {
             }
         }
 
-        const minFrames = Math.min(3, this.detectionHistory.length);
-        return currentDetections.filter(det => (classCounts[det.class] || 0) >= minFrames);
+        // While the history is still filling, scale the requirement so the
+        // first detection is not silent for a full 5 frames.
+        const required = Math.min(
+            this.minConfirmFrames,
+            Math.max(1, this.detectionHistory.length - 2)
+        );
+
+        return currentDetections.filter(det => (classCounts[det.class] || 0) >= required);
     }
 
     // ==========================================================
     // Detection Helpers
     // ==========================================================
 
-    getDetectionWithPosition(detection, videoWidth) {
+    /**
+     * Resolve a detection into pixels plus a left/centre/right position.
+     *
+     * Both producers in this file emit normalised [x, y, w, h] in 0-1 —
+     * COCO-SSD and the wall/stair layers alike — while everything
+     * downstream (distance maths, risk) works in pixels. Normalise once,
+     * here, instead of scattering the conversion.
+     *
+     * Note: the previous version compared a 0-1 centre against
+     * `videoWidth * 0.33` (~211px), so every detection resolved to "left",
+     * and handed distance maths a 0-1 width to divide by.
+     */
+    getDetectionWithPosition(detection, videoWidth = 640, videoHeight = 480) {
         const bbox = detection.bbox;
+        if (!bbox || bbox.length < 4) return null;
+
         const [x, y, width, height] = bbox;
+
+        const pxWidth = width * videoWidth;
+        const pxHeight = height * videoHeight;
         const centerX = x + width / 2;
-        const position = centerX < videoWidth * 0.33 ? 'left' :
-                         centerX > videoWidth * 0.67 ? 'right' : 'center';
+        const centerY = y + height / 2;
+
+        // Left/right is judged relative to the middle of the frame, with a
+        // dead zone so a thing dead ahead is not called "left".
+        const position = centerX < 0.40 ? 'left'
+                       : centerX > 0.60 ? 'right'
+                       : 'center';
 
         return {
             class: detection.class,
+            score: detection.score,
             confidence: Math.round(detection.score * 100),
             bbox: detection.bbox,
+            bboxPixels: [x * videoWidth, y * videoHeight, pxWidth, pxHeight],
+            widthPixels: pxWidth,
+            heightPixels: pxHeight,
             position,
             centerX,
-            centerY: y + height / 2,
-            // Extra info for walls/stairs
+            centerY,
             orientation: detection.orientation || null,
             direction: detection.direction || null,
-            stepCount: detection.stepCount || null
+            stepCount: detection.stepCount || null,
+            // Coarse screen region, used to tell "a new thing entered my
+            // path" apart from "the same thing is still there".
+            bucket: this._screenBucket(centerX, centerY)
         };
+    }
+
+    _screenBucket(cx, cy) {
+        const horizontal = cx < 0.40 ? 'L' : cx > 0.60 ? 'R' : 'C';
+        const vertical = cy < 0.45 ? 'upper' : 'lower';
+        return vertical + horizontal;
     }
 
     drawDetections(detections, canvas, videoWidth, videoHeight) {

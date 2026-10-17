@@ -35,6 +35,10 @@ window.PathAble = (function() {
         // Initialize services with error handling
         initServices();
 
+        // Mirror everything spoken into a live region, so the app is usable
+        // with speech off, in a noisy corridor, or on a muted phone.
+        initCaptions();
+
         // Bind all event handlers
         bindEvents();
 
@@ -110,6 +114,8 @@ window.PathAble = (function() {
         dom.voiceVolumeValue = document.getElementById('voice-volume-value');
         dom.voiceLanguage = document.getElementById('voice-language');
         dom.autoRepeat = document.getElementById('auto-repeat');
+        dom.sayInfo = document.getElementById('say-info');
+        dom.muteVoice = document.getElementById('mute-voice');
         dom.routePreference = document.getElementById('route-preference');
         dom.highContrast = document.getElementById('high-contrast');
         dom.largeText = document.getElementById('large-text');
@@ -138,6 +144,15 @@ window.PathAble = (function() {
 
         // Toast
         dom.toastContainer = document.getElementById('toast-container');
+    }
+
+    function initCaptions() {
+        dom.captionText = document.getElementById('caption-text');
+
+        window.VoiceAssistantService.setCaptionCallback((text) => {
+            if (!dom.captionText) return;
+            dom.captionText.textContent = text;
+        });
     }
 
     function initServices() {
@@ -282,6 +297,22 @@ window.PathAble = (function() {
         dom.autoRepeat.addEventListener('change', (e) => {
             window.VoiceAssistantService.updateSettings('autoRepeat', e.target.checked);
         });
+
+        // Speak info-level detections (distant objects)
+        dom.sayInfo.addEventListener('change', (e) => {
+            window.VoiceAssistantService.updateSettings('sayInfo', e.target.checked);
+        });
+
+        // Mute all non-critical speech
+        dom.muteVoice.addEventListener('change', (e) => {
+            window.VoiceAssistantService.updateSettings('muted', e.target.checked);
+        });
+
+        // Reflect saved voice settings in the controls
+        const vs = window.VoiceAssistantService.settings;
+        dom.autoRepeat.checked = !!vs.autoRepeat;
+        dom.sayInfo.checked = !!vs.sayInfo;
+        dom.muteVoice.checked = !!vs.muted;
 
         // Route preference
         dom.routePreference.addEventListener('change', (e) => {
@@ -815,62 +846,71 @@ window.PathAble = (function() {
         }
     }
 
-    function handleDetectionResults(detections, smoothed) {
+    function handleDetectionResults(detections) {
         const videoWidth = dom.cameraVideo.videoWidth || 640;
+        const videoHeight = dom.cameraVideo.videoHeight || 480;
 
-        // Update detection panel
-        if (detections.length > 0) {
-            // Show top detection
-            const top = detections[0];
-            const detWithPos = window.ObjectDetectionService.getDetectionWithPosition(top, videoWidth);
-            const distanceEst = window.DistanceEstimationService.estimateDistance(top, videoWidth);
-
-            dom.detectionStatus.textContent = 'Active';
-            dom.detectedObject.textContent = top.class.charAt(0).toUpperCase() + top.class.slice(1);
-            dom.detectedDistance.textContent = window.DistanceEstimationService.formatDistance(distanceEst);
-            dom.detectionConfidence.textContent = Math.round(top.score * 100) + '%';
-            dom.detectionPosition.textContent = detWithPos.position;
-
-            // Show extra info for walls and stairs
-            if (top.class === 'wall' && top.orientation) {
-                dom.detectedObject.textContent += ` (${top.orientation})`;
-            } else if (top.class === 'stairs' && top.direction) {
-                dom.detectedObject.textContent += ` (${top.direction}, ${top.stepCount || '?'} steps)`;
-            }
-
-            // Show all detected objects count
-            if (detections.length > 1) {
-                const classes = detections.map(d => d.class).join(', ');
-                dom.detectionStatus.textContent = `Active (${detections.length}: ${classes})`;
-            }
-
-            // Assess risk for ALL detections, pick highest priority
-            let highestRisk = null;
-            for (const det of detections) {
-                const dp = window.ObjectDetectionService.getDetectionWithPosition(det, videoWidth);
-                const de = window.DistanceEstimationService.estimateDistance(det, videoWidth);
-                const risk = window.ObstacleRiskService.assessRisk(dp, de);
-                if (risk && (!highestRisk || risk.priority < highestRisk.priority)) {
-                    highestRisk = risk;
-                }
-            }
-
-            if (highestRisk) {
-                window.ObstacleRiskService.triggerAlert(highestRisk, (alertRisk) => {
-                    dom.obstacleWarning.textContent = alertRisk.message;
-                    dom.obstacleWarning.className = 'warning-banner active ' + window.ObstacleRiskService.getWarningClass(alertRisk.level);
-                });
-            }
-        } else {
-            dom.detectionStatus.textContent = 'Scanning...';
-            dom.detectedObject.textContent = '—';
+        if (!detections || detections.length === 0) {
+            dom.detectionStatus.textContent = 'Clear';
+            dom.detectedObject.textContent = 'Nothing detected';
             dom.detectedDistance.textContent = '—';
             dom.detectionConfidence.textContent = '—';
             dom.detectionPosition.textContent = '—';
             dom.obstacleWarning.className = 'warning-banner';
+            dom.obstacleWarning.textContent = '';
+            dom.cameraStatus.textContent = 'Scanning';
+            return;
         }
 
-        dom.cameraStatus.textContent = 'AI Detection Active';
+        // Highest-risk object leads the panel, not whichever happened to sort
+        // first — that was showing an irrelevant object ahead of a real hazard.
+        let highestRisk = null;
+        let leadDet = null;
+
+        for (const det of detections) {
+            const dp = window.ObjectDetectionService.getDetectionWithPosition(det, videoWidth, videoHeight);
+            if (!dp) continue;
+
+            const de = window.DistanceEstimationService.estimateDistance(dp, videoWidth);
+            const risk = window.ObstacleRiskService.assessRisk(dp, de);
+            if (risk && (!highestRisk || risk.priority < highestRisk.priority)) {
+                highestRisk = risk;
+                leadDet = dp;
+                leadDet._estimate = de;
+            }
+        }
+
+        if (leadDet) {
+            dom.detectionStatus.textContent = detections.length > 1
+                ? `Active (${detections.length} objects)`
+                : 'Active';
+            dom.detectedObject.textContent = leadDet.class
+                ? leadDet.class.charAt(0).toUpperCase() + leadDet.class.slice(1)
+                : '—';
+
+            if (leadDet.orientation) {
+                dom.detectedObject.textContent += ` (${leadDet.orientation})`;
+            } else if (leadDet.direction) {
+                dom.detectedObject.textContent += ` (${leadDet.direction}${leadDet.stepCount ? `, ${leadDet.stepCount} steps` : ''})`;
+            }
+
+            dom.detectedDistance.textContent =
+                window.DistanceEstimationService.formatDistance(leadDet._estimate);
+            dom.detectionConfidence.textContent = leadDet.confidence + '%';
+            dom.detectionPosition.textContent =
+                leadDet.position === 'center' ? 'Ahead' :
+                leadDet.position === 'left' ? 'Left' : 'Right';
+        }
+
+        if (highestRisk) {
+            window.ObstacleRiskService.triggerAlert(highestRisk, (alertRisk) => {
+                dom.obstacleWarning.textContent = alertRisk.message;
+                dom.obstacleWarning.className =
+                    'warning-banner active ' + window.ObstacleRiskService.getWarningClass(alertRisk.level);
+            });
+        }
+
+        dom.cameraStatus.textContent = 'Detecting';
     }
 
     function handleStopObstacle() {

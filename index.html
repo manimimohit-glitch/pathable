@@ -229,6 +229,14 @@
                 <div class="setting-row">
                     <label for="auto-repeat"><input type="checkbox" id="auto-repeat"> Auto-repeat</label>
                 </div>
+                <div class="setting-row">
+                    <label for="say-info"><input type="checkbox" id="say-info"> Speak distant objects</label>
+                </div>
+                <div class="setting-row">
+                    <label for="mute-voice"><input type="checkbox" id="mute-voice"> Mute voice</label>
+                </div>
+                <p class="setting-note">Distant objects are shown on screen but not spoken. Turn on
+                    &ldquo;Speak distant objects&rdquo; only if you want constant updates.</p>
             </div>
 
             <div class="settings-group">
@@ -315,6 +323,12 @@
             <div class="wave-bar"></div>
         </div>
         <div class="voice-text" id="voice-overlay-text">Listening...</div>
+    </div>
+
+    <!-- Live captions: everything spoken is also shown here -->
+    <div id="caption-bar" class="caption-bar" role="status" aria-live="polite" aria-atomic="true">
+        <span class="sr-only">Spoken message:</span>
+        <span id="caption-text"></span>
     </div>
 
     <!-- Toast -->

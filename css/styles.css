@@ -1322,6 +1322,40 @@ input:focus, select:focus {
 }
 
 /* ============================================
+   Live captions
+   ============================================ */
+.caption-bar {
+    position: fixed;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+    transform: translateX(-50%);
+    max-width: min(92vw, 560px);
+    padding: 14px 18px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 12px);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+    color: var(--text-primary);
+    font-size: 1rem;
+    line-height: 1.4;
+    text-align: center;
+    z-index: 900;
+    pointer-events: none;
+}
+
+/* Keep the caption clear of the toast stack. */
+#toast-container {
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 96px);
+}
+
+.setting-note {
+    margin: 4px 0 8px;
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--text-secondary);
+}
+
+/* ============================================
    Screen Reader Only
    ============================================ */
 .sr-only {
